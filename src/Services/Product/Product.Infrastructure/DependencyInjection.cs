@@ -16,7 +16,7 @@ public static class DependencyInjection
     {
         var connectionString = configuration.GetConnectionString("ProductDb")
             ?? configuration["PRODUCT_DB_CONNECTION"]
-            ?? "Server=localhost,1433;Database=ProductDb;User Id=sa;Password=Your_strong_Password123;TrustServerCertificate=True;";
+            ?? "Server=(localdb)\\MSSQLLocalDB;Database=ProductDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
         services.AddDbContext<ProductDbContext>(options => options.UseSqlServer(connectionString));
 

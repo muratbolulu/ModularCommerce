@@ -17,6 +17,33 @@ Product servisi katmanlari:
 - `Product.Infrastructure`: EF Core, repository, Redis cache, event publisher.
 - `Product.Api`: endpoint ve authorization katmani.
 
+## Calisma Mantigi
+
+Sistem istemciden gelen tum istekleri once `Gateway.Api` uzerinden alir. Gateway, route kurallarina gore istegi ilgili mikroservise yonlendirir ve global rate limit ile asiri istekleri sinirlar.
+
+Auth akisinda:
+- `POST /auth/register` ile kullanici Identity tablosuna kaydedilir.
+- `POST /auth/login` ile kullanici dogrulanir; access token (JWT) ve refresh token uretilir.
+- `POST /auth/refresh` ile gecerli refresh token karsiliginda yeni token cifti verilir.
+
+Product akisinda (CQRS):
+- Yazma islemleri (`POST /products`, `PUT /products/{id}`) command handler'lara gider.
+- Okuma islemi (`GET /products`) query handler ile ayrik olarak calisir.
+- Yazma sonrasi `ProductCreatedEvent` / `ProductUpdatedEvent` yayinlanir.
+
+Cache mantigi:
+- `GET /products` sonucunda liste Redis'e yazilir.
+- Urun ekleme/guncelleme oldugunda ilgili cache anahtari silinir (cache invalidation).
+- Sonraki listeleme istegi taze veriyi DB'den alip tekrar cache'ler.
+
+Yetkilendirme:
+- Product yazma endpointleri JWT ve role/policy kontrolu ister (`ProductWriterPolicy`).
+- Product listeleme endpointi anonim erisime aciktir.
+
+Loglama:
+- Servisler loglari JSON/structured formatta uretmeye uygundur.
+- `Log.Api`, seviye bazli (`INFO`, `WARNING`, `ERROR`, `CRITICAL`) merkezi log toplama endpointi sunar.
+
 ## Gereksinim Karsilama Ozeti
 
 - Onion mimarisi: Product servisinde uygulandi.

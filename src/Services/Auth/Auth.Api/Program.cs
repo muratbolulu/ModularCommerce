@@ -11,7 +11,7 @@ builder.Services.AddOpenApi();
 
 var connectionString = builder.Configuration.GetConnectionString("AuthDb")
     ?? builder.Configuration["AUTH_DB_CONNECTION"]
-    ?? "Server=localhost,1433;Database=AuthDb;User Id=sa;Password=Your_strong_Password123;TrustServerCertificate=True;";
+    ?? "Server=(localdb)\\MSSQLLocalDB;Database=AuthDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<AuthDbContext>(options => options.UseSqlServer(connectionString));
 
@@ -23,10 +23,11 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
         options.Password.RequireNonAlphanumeric = false;
     })
     .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<AuthDbContext>()
-    .AddSignInManager();
+    .AddEntityFrameworkStores<AuthDbContext>();
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -119,7 +120,7 @@ static async Task SeedRolesAsync(IServiceProvider serviceProvider)
 {
     using var scope = serviceProvider.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var role in new[] { "admin", "catalog-manager", "viewer" })
