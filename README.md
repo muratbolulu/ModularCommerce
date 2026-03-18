@@ -44,6 +44,88 @@ Loglama:
 - Servisler loglari JSON/structured formatta uretmeye uygundur.
 - `Log.Api`, seviye bazli (`INFO`, `WARNING`, `ERROR`, `CRITICAL`) merkezi log toplama endpointi sunar.
 
+## API Gateway Detayli Calisma Prensibi
+
+`Gateway.Api`, YARP (`Yarp.ReverseProxy`) uzerinde calisan bir ters proxy katmanidir. Istemci, mikroservislerin gercek adreslerini bilmeden sadece Gateway'e istek atar; Gateway de path kurallarina gore uygun servise yonlendirir.
+
+### 1) Route -> Cluster -> Destination modeli
+
+Gateway konfigrasyonu `src/Gateway/Gateway.Api/appsettings.json` icinde `ReverseProxy` altindadir:
+
+- `Route`: Dis dunyadan gelen path'i esler.
+- `Cluster`: O path'in yonlendirilecegi mantiksal servis grubudur.
+- `Destination`: Cluster icindeki gercek hedef URL'dir.
+
+Bu projede temel route eslesmeleri:
+
+- `/auth` ve `/auth/{**catch-all}` -> `auth-cluster`
+- `/products` ve `/products/{**catch-all}` -> `product-cluster`
+- `/logs` ve `/logs/{**catch-all}` -> `log-cluster`
+
+Lokal debug modunda destination adresleri:
+
+- `auth-cluster` -> `http://localhost:5297/`
+- `product-cluster` -> `http://localhost:5124/`
+- `log-cluster` -> `http://localhost:5092/`
+
+Docker modunda bu destination'lar ortam degiskenleriyle container isimlerine override edilir:
+
+- `auth-api:8080`
+- `product-api:8080`
+- `log-api:8080`
+
+### 2) Request pipeline sirasi
+
+Gateway tarafinda istek su sirada islenir:
+
+1. Istek Gateway portuna gelir (lokal: `5228`, docker: `5000`).
+2. Global rate limiter calisir.
+3. YARP route matching yapar ve hedef cluster'i secilir.
+4. Request transform calisir (`X-Gateway: modular-commerce-gateway` header'i eklenir).
+5. Istek ilgili mikroservise proxy edilir.
+6. Mikroservis cevabi oldugu gibi istemciye geri doner.
+
+### 3) Rate limiting davranisi
+
+Gateway'de global fixed-window limiter vardir:
+
+- pencere: `10` saniye
+- limit: `20` istek / IP
+- kuyruk: `2` istek
+- limit asiminda donen durum kodu: `429 Too Many Requests`
+
+Bu sayede tum endpointler merkezi olarak korunur; mikroservislerin her birinde ayri rate limit yazmaya gerek kalmaz.
+
+### 4) Neden API Gateway kullaniliyor?
+
+Bu yapi su avantajlari saglar:
+
+- tek giris noktasi (single entrypoint),
+- merkezi trafik yonetimi (rate limit, header policy),
+- istemciyi servis adreslerinden bagimsizlastirma,
+- servisleri ayri ayri tasirken istemciyi bozmama (sadece gateway config degisir),
+- izlenebilirligi artirma (talepler tek noktadan gecer).
+
+### 5) Hata ayiklama ve dogrulama
+
+Gateway calisma kontrolu:
+
+- `GET /health` ile ayakta oldugu dogrulanir.
+- `GET /openapi/v1.json` ile uygulamanin acildigi gorulur.
+
+Proxy dogrulama:
+
+- `POST /auth/login` istegi Gateway uzerinden atildiginda Auth servisine ulasmali.
+- `GET /products` istegi Gateway uzerinden Product servisine ulasmali.
+- `POST /logs` istegi Gateway uzerinden Log servisine ulasmali.
+
+Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
+
+- hedef mikroservislerin calisip calismadigi,
+- `ReverseProxy` destination URL'lerinin dogrulugu,
+- lokal/docker port farki (`5228` vs `5000`),
+- rate limit nedeniyle `429` alinip alinmadigi.
+
 ## Gereksinim Karsilama Ozeti
 
 - Onion mimarisi: Product servisinde uygulandi.
