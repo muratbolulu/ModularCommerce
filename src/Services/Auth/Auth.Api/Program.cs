@@ -11,7 +11,7 @@ builder.Services.AddOpenApi();
 
 var connectionString = builder.Configuration.GetConnectionString("AuthDb")
     ?? builder.Configuration["AUTH_DB_CONNECTION"]
-    ?? "Server=(localdb)\\MSSQLLocalDB;Database=AuthDb;Trusted_Connection=True;TrustServerCertificate=True;";
+    ?? "Server=DESKTOP-7CMCCUI\\SQLEXPRESS2022;Database=AuthDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<AuthDbContext>(options => options.UseSqlServer(connectionString));
 

@@ -8,7 +8,7 @@ public sealed class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbCon
     public AuthDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("AUTH_DB_CONNECTION")
-            ?? "Server=(localdb)\\MSSQLLocalDB;Database=AuthDb;Trusted_Connection=True;TrustServerCertificate=True;";
+            ?? "Server=DESKTOP-7CMCCUI\\SQLEXPRESS2022;Database=AuthDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
         var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
         optionsBuilder.UseSqlServer(connectionString);

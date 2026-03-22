@@ -8,7 +8,7 @@ public sealed class ProductDbContextFactory : IDesignTimeDbContextFactory<Produc
     public ProductDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("PRODUCT_DB_CONNECTION")
-            ?? "Server=(localdb)\\MSSQLLocalDB;Database=ProductDb;Trusted_Connection=True;TrustServerCertificate=True;";
+            ?? "Server=DESKTOP-7CMCCUI\\SQLEXPRESS2022;Database=ModulerCommerceProductDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
         var optionsBuilder = new DbContextOptionsBuilder<ProductDbContext>();
         optionsBuilder.UseSqlServer(connectionString);

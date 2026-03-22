@@ -1,19 +1,16 @@
 using System.Security.Claims;
 using System.Text;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Product.Application;
-using Product.Application.Products.Commands;
-using Product.Application.Products.Queries;
 using Product.Infrastructure;
 using Product.Infrastructure.Persistence;
-using Shared.Contracts.Products;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -60,33 +57,6 @@ using (var scope = app.Services.CreateScope())
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.MapPost("/products", async (CreateProductRequest request, ISender sender, CancellationToken cancellationToken) =>
-{
-    var result = await sender.Send(new CreateProductCommand(request.Name, request.Price, request.Stock), cancellationToken);
-    return Results.Created($"/products/{result.Id}", result);
-})
-.RequireAuthorization("ProductWriterPolicy");
-
-app.MapPut("/products/{id:guid}", async (Guid id, UpdateProductRequest request, ISender sender, CancellationToken cancellationToken) =>
-{
-    try
-    {
-        var result = await sender.Send(new UpdateProductCommand(id, request.Name, request.Price, request.Stock), cancellationToken);
-        return Results.Ok(result);
-    }
-    catch (KeyNotFoundException ex)
-    {
-        return Results.NotFound(new { ex.Message });
-    }
-})
-.RequireAuthorization("ProductWriterPolicy");
-
-app.MapGet("/products", async (ISender sender, CancellationToken cancellationToken) =>
-{
-    var result = await sender.Send(new GetProductsQuery(), cancellationToken);
-    return Results.Ok(result);
-})
-.AllowAnonymous();
+app.MapControllers();
 
 app.Run();
