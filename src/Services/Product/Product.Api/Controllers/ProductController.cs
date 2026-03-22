@@ -12,16 +12,19 @@ namespace Product.Api.Controllers;
 public sealed class ProductController : ControllerBase
 {
     private readonly ISender _sender;
+    private readonly ILogger<ProductController> _logger;
 
-    public ProductController(ISender sender)
+    public ProductController(ISender sender, ILogger<ProductController> logger)
     {
         _sender = sender;
+        _logger = logger;
     }
 
     [HttpPost]
     [Authorize(Policy = "ProductWriterPolicy")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Create product request received for {Name}", request.Name);
         var result = await _sender.Send(new CreateProductCommand(request.Name, request.Price, request.Stock), cancellationToken);
         return Created($"/products/{result.Id}", result);
     }
@@ -32,11 +35,13 @@ public sealed class ProductController : ControllerBase
     {
         try
         {
+            _logger.LogInformation("Update product request received for {ProductId}", id);
             var result = await _sender.Send(new UpdateProductCommand(id, request.Name, request.Price, request.Stock), cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
         {
+            _logger.LogWarning(ex, "Product {ProductId} could not be updated because it does not exist", id);
             return NotFound(new { ex.Message });
         }
     }
@@ -45,6 +50,7 @@ public sealed class ProductController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetProducts(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Get products request received");
         var result = await _sender.Send(new GetProductsQuery(), cancellationToken);
         return Ok(result);
     }

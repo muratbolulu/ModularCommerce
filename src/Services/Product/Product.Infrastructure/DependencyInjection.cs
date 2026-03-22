@@ -25,6 +25,10 @@ public static class DependencyInjection
         {
             var options = ConfigurationOptions.Parse(redisConnection);
             options.AbortOnConnectFail = false;
+            options.ConnectRetry = 1;
+            options.ConnectTimeout = 2000;
+            options.SyncTimeout = 2000;
+            options.AsyncTimeout = 2000;
             return ConnectionMultiplexer.Connect(options);
         });
 

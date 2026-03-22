@@ -68,17 +68,11 @@ Lokal debug modunda destination adresleri:
 - `product-cluster` -> `http://localhost:5124/`
 - `log-cluster` -> `http://localhost:5092/`
 
-Docker modunda bu destination'lar ortam degiskenleriyle container isimlerine override edilir:
-
-- `auth-api:8080`
-- `product-api:8080`
-- `log-api:8080`
-
 ### 2) Request pipeline sirasi
 
 Gateway tarafinda istek su sirada islenir:
 
-1. Istek Gateway portuna gelir (lokal: `5228`, docker: `5000`).
+1. Istek Gateway portuna gelir (lokal: `5228`).
 2. Global rate limiter calisir.
 3. YARP route matching yapar ve hedef cluster'i secilir.
 4. Request transform calisir (`X-Gateway: modular-commerce-gateway` header'i eklenir).
@@ -123,7 +117,7 @@ Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
 
 - hedef mikroservislerin calisip calismadigi,
 - `ReverseProxy` destination URL'lerinin dogrulugu,
-- lokal/docker port farki (`5228` vs `5000`),
+- servislerin lokal portlarda ayakta oldugu,
 - rate limit nedeniyle `429` alinip alinmadigi.
 
 ## Gereksinim Karsilama Ozeti
@@ -138,19 +132,6 @@ Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
   - config degerleri environment variable ile override edilebilir,
   - stateless API processleri,
   - logs stdout uzerinden merkezi toplanmaya uygun.
-
-## Calistirma (Docker)
-
-```bash
-docker compose up --build
-```
-
-Servisler:
-
-- Gateway: `http://localhost:5000`
-- Auth: `http://localhost:5001`
-- Product: `http://localhost:5002`
-- Log: `http://localhost:5003`
 
 ## Calistirma (Lokal, dotnet run)
 

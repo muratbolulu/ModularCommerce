@@ -5,4 +5,5 @@ public sealed record LogEntryContract(
     string Level,
     string Message,
     DateTime OccurredAtUtc,
-    Dictionary<string, object?>? Metadata);
+    Dictionary<string, object?>? Metadata,
+    string? Exception);

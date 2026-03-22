@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Product.Application.Abstractions;
 using Product.Application.Products.Mappers;
 using Shared.Contracts.Events;
@@ -11,19 +12,23 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
     private readonly IProductRepository _repository;
     private readonly ICacheService _cacheService;
     private readonly IEventPublisher _eventPublisher;
+    private readonly ILogger<UpdateProductCommandHandler> _logger;
 
     public UpdateProductCommandHandler(
         IProductRepository repository,
         ICacheService cacheService,
-        IEventPublisher eventPublisher)
+        IEventPublisher eventPublisher,
+        ILogger<UpdateProductCommandHandler> logger)
     {
         _repository = repository;
         _cacheService = cacheService;
         _eventPublisher = eventPublisher;
+        _logger = logger;
     }
 
     public async Task<ProductDto> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Updating product {ProductId}", request.Id);
         var entity = await _repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new KeyNotFoundException($"Product {request.Id} not found.");
 
@@ -36,6 +41,7 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             new ProductUpdatedEvent(entity.Id, entity.Name, entity.Price, entity.Stock, DateTime.UtcNow),
             cancellationToken);
 
+        _logger.LogInformation("Product {ProductId} updated and cache invalidated", entity.Id);
         return entity.ToDto();
     }
 }
