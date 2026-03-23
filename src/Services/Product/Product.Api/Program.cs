@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Product.Api.Logging;
 using Product.Application;
 using Product.Infrastructure;
+using Product.Infrastructure.Messaging;
 using Product.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,6 +89,8 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
     await dbContext.Database.MigrateAsync();
+    var topologyInitializer = scope.ServiceProvider.GetRequiredService<IRabbitMqTopologyInitializer>();
+    await topologyInitializer.EnsureCreatedAsync(CancellationToken.None);
 }
 
 app.UseAuthentication();

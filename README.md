@@ -29,7 +29,8 @@ Auth akisinda:
 Product akisinda (CQRS):
 - Yazma islemleri (`POST /products`, `PUT /products/{id}`) command handler'lara gider.
 - Okuma islemi (`GET /products`) query handler ile ayrik olarak calisir.
-- Yazma sonrasi `ProductCreatedEvent` / `ProductUpdatedEvent` yayinlanir.
+- Yazma sonrasi `ProductCreatedEvent` / `ProductUpdatedEvent` RabbitMQ exchange uzerinden yayinlanir.
+- Uygulama acilisinda RabbitMQ exchange/queue/binding topolojisi otomatik olusturulur.
 
 Cache mantigi:
 - `GET /products` sonucunda liste Redis'e yazilir.
@@ -136,7 +137,8 @@ Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
 ## Calistirma (Lokal, dotnet run)
 
 1. SQL Server ve Redis ayaga kaldirin.
-2. Sirayla servisleri calistirin:
+2. RabbitMQ ayaga kaldirin (varsayilan: `localhost:5672`, `guest/guest`).
+3. Sirayla servisleri calistirin:
 
 ```bash
 dotnet run --project src/Services/Auth/Auth.Api
@@ -149,6 +151,30 @@ Gateway varsayilan local adresler:
 - Auth: `http://localhost:5297`
 - Product: `http://localhost:5124`
 - Log: `http://localhost:5092`
+
+## Docker Kullandigimiz Yerler
+
+Bu projede uygulama servisleri (`Auth.Api`, `Product.Api`, `Log.Api`, `Gateway.Api`) lokal `dotnet run` ile calistirilir.
+Docker, destek servislerini hizli ve izole sekilde ayaga kaldirmak icin kullanilir:
+
+- `Redis` (cache): `localhost:6379`
+- `RabbitMQ` (event broker): `localhost:5672`
+- `RabbitMQ Management UI`: `http://localhost:15672` (`guest/guest`)
+- `Elasticsearch` (log index): `http://localhost:9200`
+- `Kibana` (log analiz): `http://localhost:5601`
+
+Ornek Docker komutlari:
+
+```bash
+docker run -d --name redis -p 6379:6379 redis:7
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+docker run -d --name elasticsearch -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+docker run -d --name kibana -p 5601:5601 -e "ELASTICSEARCH_HOSTS=http://host.docker.internal:9200" docker.elastic.co/kibana/kibana:8.17.0
+```
+
+Not:
+- Kibana Linux container'inda host Elasticsearch'e baglanirken `host.docker.internal` kullanilir.
+- Bu portlar `appsettings.json` degerleriyle uyumludur (`REDIS_CONNECTION`, `RABBITMQ_*`, `ELASTICSEARCH_URL`).
 
 ## Ornek Akis
 
@@ -188,5 +214,54 @@ GET /products
 ## Gelistirme Notlari
 
 - Event publish katmani `IEventPublisher` abstraction'i ile ayrildi; RabbitMQ/Kafka adaptoru eklemek icin `Product.Infrastructure` altina yeni implementasyon yeterlidir.
+- RabbitMQ ayarlari `Product.Api/appsettings.json` icinde `RABBITMQ_*` anahtarlariyla yonetilir.
+- Varsayilan routing key ve queue eslesmeleri:
+  - `product.created` -> `product.created.queue`
+  - `product.updated` -> `product.updated.queue`
 - Authorization role/policy tabanli olacak sekilde tasarlandi (`ProductWriterPolicy`).
 - CI/CD ve SAGA, dokumandaki "ekstra degerlendirme" kismina uygun olarak sonraki iterasyonda genisletilebilir.
+
+## Kullanilan Patternler ve Nedenleri
+
+Bu bolumde projede secilen temel yaklasimlarin "neden"i ozetlenir.
+
+### 1) Onion Architecture
+
+- `Domain`, `Application`, `Infrastructure`, `Api` katmanlari birbirinden ayridir.
+- Neden: Is kurallarini teknik bagimliliklardan ayirmak, test edilebilirligi ve degistirilebilirligi artirmak.
+
+### 2) CQRS (Command/Query Responsibility Segregation)
+
+- Yazma (`CreateProduct`, `UpdateProduct`) ve okuma (`GetProducts`) akislarinin ayri handler'lari vardir.
+- Neden: Okuma/yazma gereksinimleri farkli oldugu icin performans ve bakim avantajı saglar; cache stratejisi query tarafinda netlesir.
+
+### 3) Repository + Abstraction
+
+- `IProductRepository`, `ICacheService`, `IEventPublisher` gibi arayuzler kullanilir.
+- Neden: Uygulama katmani altyapi detaylarini bilmez; SOLID (ozellikle DIP) uyumu saglanir.
+
+### 4) Event-Driven yaklasim (RabbitMQ)
+
+- Product degisiklikleri olay olarak publish edilir (`product.created`, `product.updated`).
+- Neden: Mikroservisler arasinda gevsek baglilik, asenkron isleme, olceklenebilir entegrasyon.
+
+### 5) RabbitMQ'da Neden Binding Kullaniyoruz?
+
+- Exchange tek basina mesaji kuyruga gondermez; hangi mesajin hangi kuyruga gidecegi `binding` ile tanimlanir.
+- Bu projede:
+  - `product.created` routing key'i -> `product.created.queue`
+  - `product.updated` routing key'i -> `product.updated.queue`
+- Neden:
+  - Mesajlari tipine gore ayristirip dogru tuketiciye yonlendirmek
+  - Yeni event tipleri eklendiginde mevcut akis bozulmadan yeni queue/binding tanimlayabilmek
+  - Producer (Product API) ile consumer'lari bagimsiz tutmak
+
+### 6) API Gateway + Rate Limiting
+
+- YARP Gateway ile tek giris noktasi, global fixed-window rate limit uygulanir.
+- Neden: Merkezi trafik yonetimi, istemciyi servis adreslerinden bagimsizlastirma ve sistemin korunmasi.
+
+### 7) Structured Logging + Merkezi Toplama
+
+- Loglar JSON formatinda uretilir ve merkezi `Log.Api` uzerinden toplanir (Elastic/Seq sinkleri desteklenir).
+- Neden: Aranabilir, filtrelenebilir ve izlenebilir operasyonel gorunurluk saglamak.

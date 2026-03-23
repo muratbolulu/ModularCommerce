@@ -34,7 +34,8 @@ public static class DependencyInjection
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddSingleton<ICacheService, RedisCacheService>();
-        services.AddScoped<IEventPublisher, ConsoleEventPublisher>();
+        services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
+        services.AddSingleton<IRabbitMqTopologyInitializer, RabbitMqTopologyInitializer>();
 
         return services;
     }
