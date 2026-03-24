@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddDbContext<CatalogDbContext>(options => options.UseSqlServer(connectionString));
         services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICatalogSagaRepository, CatalogSagaRepository>();
+        services.AddScoped<ICatalogCompensationEventPublisher, CatalogCompensationEventPublisher>();
         services.AddHostedService<CatalogRabbitMqConsumer>();
 
         return services;

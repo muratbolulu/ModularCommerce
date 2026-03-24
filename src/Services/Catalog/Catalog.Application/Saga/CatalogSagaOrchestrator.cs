@@ -9,15 +9,18 @@ public sealed class CatalogSagaOrchestrator : ICatalogSagaOrchestrator
 {
     private readonly ICatalogRepository _catalogRepository;
     private readonly ICatalogSagaRepository _sagaRepository;
+    private readonly ICatalogCompensationEventPublisher _compensationEventPublisher;
     private readonly ILogger<CatalogSagaOrchestrator> _logger;
 
     public CatalogSagaOrchestrator(
         ICatalogRepository catalogRepository,
         ICatalogSagaRepository sagaRepository,
+        ICatalogCompensationEventPublisher compensationEventPublisher,
         ILogger<CatalogSagaOrchestrator> logger)
     {
         _catalogRepository = catalogRepository;
         _sagaRepository = sagaRepository;
+        _compensationEventPublisher = compensationEventPublisher;
         _logger = logger;
     }
 
@@ -58,6 +61,14 @@ public sealed class CatalogSagaOrchestrator : ICatalogSagaOrchestrator
             saga.MoveTo(CatalogSagaState.Compensated, ex.Message);
             saga.MoveTo(CatalogSagaState.Failed, ex.Message);
             await _sagaRepository.UpdateAsync(saga, cancellationToken);
+            await _compensationEventPublisher.PublishCatalogWriteFailedAsync(
+                new CatalogWriteFailedEvent(
+                    @event.ProductId,
+                    sagaKey,
+                    nameof(ProductCreatedEvent),
+                    ex.Message,
+                    DateTime.UtcNow),
+                cancellationToken);
 
             _logger.LogError(ex, "Catalog create saga failed and compensated for product {ProductId}", @event.ProductId);
         }
@@ -112,6 +123,14 @@ public sealed class CatalogSagaOrchestrator : ICatalogSagaOrchestrator
             saga.MoveTo(CatalogSagaState.Compensated, ex.Message);
             saga.MoveTo(CatalogSagaState.Failed, ex.Message);
             await _sagaRepository.UpdateAsync(saga, cancellationToken);
+            await _compensationEventPublisher.PublishCatalogWriteFailedAsync(
+                new CatalogWriteFailedEvent(
+                    @event.ProductId,
+                    sagaKey,
+                    nameof(ProductUpdatedEvent),
+                    ex.Message,
+                    DateTime.UtcNow),
+                cancellationToken);
             _logger.LogError(ex, "Catalog update saga failed and compensated for product {ProductId}", @event.ProductId);
         }
     }

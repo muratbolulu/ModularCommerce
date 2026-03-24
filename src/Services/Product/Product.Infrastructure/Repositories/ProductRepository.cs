@@ -18,12 +18,26 @@ public sealed class ProductRepository : IProductRepository
         => await _dbContext.Products.AddAsync(product, cancellationToken);
 
     public async Task<ProductEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
-        => await _dbContext.Products.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        => await _dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
     public async Task<IReadOnlyCollection<ProductEntity>> GetAllAsync(CancellationToken cancellationToken)
         => await _dbContext.Products
+            .Where(x => x.IsActive && !x.IsDeleted)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(cancellationToken);
+
+    public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.Products.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (entity is null)
+        {
+            return false;
+        }
+
+        entity.SoftDelete();
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
         => await _dbContext.SaveChangesAsync(cancellationToken);

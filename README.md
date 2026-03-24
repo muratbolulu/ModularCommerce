@@ -45,6 +45,7 @@ Catalog akisinda (SAGA):
 - Her olay icin bir saga kaydi acilir (`catalog-create-{productId}`, `catalog-update-{productId}`).
 - Saga adimlari: `Started` -> `CatalogWriteCompleted` -> `Completed`.
 - Hata olursa saga `Compensating` adimina gecer, write islemi geri alinmaya calisilir ve durum `Failed` olarak isaretlenir.
+- Ek compensation: `Catalog` yazimi basarisiz olursa `catalog.write.failed` eventi publish edilir; `Product.Api` bu eventi tuketip ilgili urunu soft-delete (`IsDeleted=true`) yapar.
 - Bu sayede Product verisi Catalog read-model'ine eventual consistency ile yansitilir.
 
 Cache mantigi:
@@ -311,4 +312,7 @@ Bu bolumde projede secilen temel yaklasimlarin "neden"i ozetlenir.
   - Event tekrarlarinda idempotency saglamak (aynı saga key ile tekrar islemi engellemek),
   - Basarisiz adimlarda compensation uygulayarak catalog verisini tutarsiz birakmamak,
   - Async mikroservis senkronizasyonunda hangi adimda hata oldugunu `CatalogSagas` tablosundan izleyebilmek.
+- Bu iterasyonda compensation adimi Product servisine de tasindi:
+  - `CatalogWriteFailedEvent` -> routing key `catalog.write.failed`
+  - `Product` tarafinda consumer bu eventi alip ilgili urunu soft-delete eder.
 - Bu nedenle Catalog servisi ayrica gelistirildi: Product'in write modelini dogrudan sorgulamak yerine, event-driven read model olusturarak servisler arasi bagimliligi azaltiyor.

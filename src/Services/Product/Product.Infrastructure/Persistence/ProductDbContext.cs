@@ -20,6 +20,9 @@ public sealed class ProductDbContext : DbContext
             cfg.Property(x => x.Name).HasMaxLength(200).IsRequired();
             cfg.Property(x => x.Price).HasPrecision(18, 2);
             cfg.Property(x => x.Stock).IsRequired();
+            cfg.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+            cfg.Property(x => x.IsDeleted).IsRequired();
+            cfg.Property(x => x.DeletedAtUtc).IsRequired(false);
             cfg.Property(x => x.CreatedAtUtc).IsRequired();
             cfg.Property(x => x.UpdatedAtUtc).IsRequired();
         });

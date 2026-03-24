@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
         services.AddSingleton<IRabbitMqTopologyInitializer, RabbitMqTopologyInitializer>();
+        services.AddHostedService<CatalogWriteFailedConsumer>();
 
         return services;
     }
