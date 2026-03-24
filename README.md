@@ -7,6 +7,7 @@ Bu repo, "Backend Developer - 3. Asama Task" dokumanina uygun olarak Onion + mik
 - `Gateway.Api`: YARP tabanli API Gateway, global rate limiting.
 - `Auth.Api`: Microsoft Identity + JWT + Refresh Token.
 - `Product.Api`: Onion architecture + CQRS (MediatR) + Redis cache + cache invalidation.
+- `Catalog.Api`: Onion architecture + RabbitMQ consumer + SAGA orchestrator (Product event senkronizasyonu).
 - `Log.Api`: Merkezi structured logging endpoint.
 - `Shared.Contracts`: Mikroservisler arasi paylasilan DTO/event sozlesmeleri.
 
@@ -16,6 +17,13 @@ Product servisi katmanlari:
 - `Product.Application`: CQRS command/query ve abstraction katmani.
 - `Product.Infrastructure`: EF Core, repository, Redis cache, event publisher.
 - `Product.Api`: endpoint ve authorization katmani.
+
+Catalog servisi katmanlari:
+
+- `Catalog.Domain`: `CatalogItem`, `CatalogSagaInstance`, saga state modeli.
+- `Catalog.Application`: SAGA orkestrasyon akisi ve read servisleri.
+- `Catalog.Infrastructure`: EF Core repository + RabbitMQ event consumer.
+- `Catalog.Api`: controller, hosted consumer, migration/bootstrap katmani.
 
 ## Calisma Mantigi
 
@@ -31,6 +39,13 @@ Product akisinda (CQRS):
 - Okuma islemi (`GET /products`) query handler ile ayrik olarak calisir.
 - Yazma sonrasi `ProductCreatedEvent` / `ProductUpdatedEvent` RabbitMQ exchange uzerinden yayinlanir.
 - Uygulama acilisinda RabbitMQ exchange/queue/binding topolojisi otomatik olusturulur.
+
+Catalog akisinda (SAGA):
+- `Catalog.Api`, RabbitMQ'dan `product.created` ve `product.updated` olaylarini dinler.
+- Her olay icin bir saga kaydi acilir (`catalog-create-{productId}`, `catalog-update-{productId}`).
+- Saga adimlari: `Started` -> `CatalogWriteCompleted` -> `Completed`.
+- Hata olursa saga `Compensating` adimina gecer, write islemi geri alinmaya calisilir ve durum `Failed` olarak isaretlenir.
+- Bu sayede Product verisi Catalog read-model'ine eventual consistency ile yansitilir.
 
 Cache mantigi:
 - `GET /products` sonucunda liste Redis'e yazilir.
@@ -61,12 +76,14 @@ Bu projede temel route eslesmeleri:
 
 - `/auth` ve `/auth/{**catch-all}` -> `auth-cluster`
 - `/products` ve `/products/{**catch-all}` -> `product-cluster`
+- `/catalog` ve `/catalog/{**catch-all}` -> `catalog-cluster`
 - `/logs` ve `/logs/{**catch-all}` -> `log-cluster`
 
 Lokal debug modunda destination adresleri:
 
 - `auth-cluster` -> `http://localhost:5297/`
 - `product-cluster` -> `http://localhost:5124/`
+- `catalog-cluster` -> `http://localhost:5002/`
 - `log-cluster` -> `http://localhost:5092/`
 
 ### 2) Request pipeline sirasi
@@ -112,6 +129,7 @@ Proxy dogrulama:
 
 - `POST /auth/login` istegi Gateway uzerinden atildiginda Auth servisine ulasmali.
 - `GET /products` istegi Gateway uzerinden Product servisine ulasmali.
+- `GET /catalog/items` istegi Gateway uzerinden Catalog servisine ulasmali.
 - `POST /logs` istegi Gateway uzerinden Log servisine ulasmali.
 
 Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
@@ -123,11 +141,12 @@ Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
 
 ## Gereksinim Karsilama Ozeti
 
-- Onion mimarisi: Product servisinde uygulandi.
+- Onion mimarisi: Product ve Catalog servislerinde uygulandi.
 - CQRS: `CreateProductCommand`, `UpdateProductCommand`, `GetProductsQuery`.
 - JWT + Refresh Token: Auth servisi.
 - API Gateway + Rate Limiting: Gateway servisinde global fixed-window policy.
 - Redis cache + invalidation: Product listeleme cache'lenir, create/update sonrasinda temizlenir.
+- SAGA orchestration: Product eventlerinin Catalog read-model'ine guvenli senkronizasyonu.
 - Structured logging: Log servisinde seviye bazli (`INFO/WARNING/ERROR/CRITICAL`) loglama.
 - 12-factor uyumu:
   - config degerleri environment variable ile override edilebilir,
@@ -143,6 +162,7 @@ Eger Gateway ayakta ama proxy basarisizsa ilk bakilacak noktalar:
 ```bash
 dotnet run --project src/Services/Auth/Auth.Api
 dotnet run --project src/Services/Product/Product.Api
+dotnet run --project src/Services/Catalog/Catalog.Api
 dotnet run --project src/Services/Log/Log.Api
 dotnet run --project src/Gateway/Gateway.Api
 ```
@@ -150,6 +170,7 @@ dotnet run --project src/Gateway/Gateway.Api
 Gateway varsayilan local adresler:
 - Auth: `http://localhost:5297`
 - Product: `http://localhost:5124`
+- Catalog: `http://localhost:5002`
 - Log: `http://localhost:5092`
 
 ## Docker Kullandigimiz Yerler
@@ -211,6 +232,23 @@ POST /products
 GET /products
 ```
 
+5. Catalog read model ve saga durumunu kontrol et:
+```http
+GET /catalog/items
+GET /catalog/sagas
+```
+
+## Postman Collection
+
+- Hazir koleksiyon dosyasi: `ModularCommerce.postman_collection.json`
+- Import adimlari:
+  - Postman -> Import -> File -> `ModularCommerce.postman_collection.json`
+  - Collection Variables icinde gerekirse `baseUrl`, `authEmail`, `authPassword` degerlerini guncelle.
+- Koleksiyon akis sirasi:
+  - `1 - Auth Login` ile token alir,
+  - `2 - Create Product` ve `3 - Update Product` ile saga tetikler,
+  - `5 - Get Catalog Items` ve `6 - Get Catalog Sagas` testleri ile senkronizasyonu dogrular.
+
 ## Gelistirme Notlari
 
 - Event publish katmani `IEventPublisher` abstraction'i ile ayrildi; RabbitMQ/Kafka adaptoru eklemek icin `Product.Infrastructure` altina yeni implementasyon yeterlidir.
@@ -265,3 +303,12 @@ Bu bolumde projede secilen temel yaklasimlarin "neden"i ozetlenir.
 
 - Loglar JSON formatinda uretilir ve merkezi `Log.Api` uzerinden toplanir (Elastic/Seq sinkleri desteklenir).
 - Neden: Aranabilir, filtrelenebilir ve izlenebilir operasyonel gorunurluk saglamak.
+
+### 8) SAGA Pattern (Catalog senkronizasyonu)
+
+- Product servisinden gelen eventler Catalog tarafinda tek adimlik degil, durum takipli bir is akisi (state machine) ile islenir.
+- Neden:
+  - Event tekrarlarinda idempotency saglamak (aynı saga key ile tekrar islemi engellemek),
+  - Basarisiz adimlarda compensation uygulayarak catalog verisini tutarsiz birakmamak,
+  - Async mikroservis senkronizasyonunda hangi adimda hata oldugunu `CatalogSagas` tablosundan izleyebilmek.
+- Bu nedenle Catalog servisi ayrica gelistirildi: Product'in write modelini dogrudan sorgulamak yerine, event-driven read model olusturarak servisler arasi bagimliligi azaltiyor.
