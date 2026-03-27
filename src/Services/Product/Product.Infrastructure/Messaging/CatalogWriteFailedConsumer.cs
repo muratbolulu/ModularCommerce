@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Product.Application.Abstractions;
-using Product.Application.Products;
+using Product.Application.Shared;
 using RabbitMQ.Client;
 using Shared.Contracts.Events;
 
@@ -86,7 +86,7 @@ public sealed class CatalogWriteFailedConsumer : BackgroundService
                     var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
 
                     var deleted = await productRepository.SoftDeleteAsync(@event.ProductId, stoppingToken);
-                    await cacheService.RemoveAsync(CacheKeys.ProductsList, stoppingToken);
+                    await cacheService.RemoveAsync(ProductCacheKeys.ProductsList, stoppingToken);
 
                     if (deleted)
                     {

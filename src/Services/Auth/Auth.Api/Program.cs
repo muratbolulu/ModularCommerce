@@ -1,7 +1,11 @@
 using Auth.Api.Auth;
+using Auth.Api.Features.Auth.Login;
+using Auth.Api.Features.Auth.Refresh;
+using Auth.Api.Features.Auth.Register;
 using Auth.Api.Logging;
 using Auth.Api.Persistence;
 using Auth.Api.Persistence.Entities;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +33,10 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddEntityFrameworkStores<AuthDbContext>();
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddTransient<RegisterUserCommandValidator>();
+builder.Services.AddTransient<LoginCommandValidator>();
+builder.Services.AddTransient<RefreshTokenCommandValidator>();
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 

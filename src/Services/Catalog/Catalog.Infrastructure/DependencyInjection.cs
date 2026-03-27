@@ -20,7 +20,6 @@ public static class DependencyInjection
         services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICatalogSagaRepository, CatalogSagaRepository>();
         services.AddScoped<ICatalogCompensationEventPublisher, CatalogCompensationEventPublisher>();
-        services.AddHostedService<CatalogRabbitMqConsumer>();
 
         return services;
     }

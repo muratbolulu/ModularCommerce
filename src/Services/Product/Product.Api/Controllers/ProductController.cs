@@ -1,8 +1,9 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Product.Application.Products.Commands;
-using Product.Application.Products.Queries;
+using Product.Api.Features.Products.Create;
+using Product.Api.Features.Products.List;
+using Product.Api.Features.Products.Update;
 using Shared.Contracts.Products;
 
 namespace Product.Api.Controllers;
@@ -24,9 +25,17 @@ public sealed class ProductController : ControllerBase
     [Authorize(Policy = "ProductWriterPolicy")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Create product request received for {Name}", request.Name);
-        var result = await _sender.Send(new CreateProductCommand(request.Name, request.Price, request.Stock), cancellationToken);
-        return Created($"/products/{result.Id}", result);
+        try
+        {
+            _logger.LogInformation("Create product request received for {Name}", request.Name);
+            var result = await _sender.Send(new CreateProductCommand(request.Name, request.Price, request.Stock), cancellationToken);
+            return Created($"/products/{result.Id}", result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Create product request validation failed");
+            return BadRequest(new { ex.Message });
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -43,6 +52,11 @@ public sealed class ProductController : ControllerBase
         {
             _logger.LogWarning(ex, "Product {ProductId} could not be updated because it does not exist", id);
             return NotFound(new { ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Update product request validation failed for {ProductId}", id);
+            return BadRequest(new { ex.Message });
         }
     }
 

@@ -1,4 +1,6 @@
-using Catalog.Application.Catalog;
+using Catalog.Api.Features.Catalog.Queries.GetCatalogItems;
+using Catalog.Api.Features.Catalog.Queries.GetCatalogSagas;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Catalog.Api.Controllers;
@@ -7,24 +9,24 @@ namespace Catalog.Api.Controllers;
 [Route("catalog")]
 public sealed class CatalogController : ControllerBase
 {
-    private readonly CatalogReadService _catalogReadService;
+    private readonly ISender _sender;
 
-    public CatalogController(CatalogReadService catalogReadService)
+    public CatalogController(ISender sender)
     {
-        _catalogReadService = catalogReadService;
+        _sender = sender;
     }
 
     [HttpGet("items")]
     public async Task<IActionResult> GetItems(CancellationToken cancellationToken)
     {
-        var items = await _catalogReadService.GetItemsAsync(cancellationToken);
+        var items = await _sender.Send(new GetCatalogItemsQuery(), cancellationToken);
         return Ok(items);
     }
 
     [HttpGet("sagas")]
     public async Task<IActionResult> GetSagas(CancellationToken cancellationToken)
     {
-        var sagas = await _catalogReadService.GetSagaStatesAsync(cancellationToken);
+        var sagas = await _sender.Send(new GetCatalogSagasQuery(), cancellationToken);
         return Ok(sagas);
     }
 }

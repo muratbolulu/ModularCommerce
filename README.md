@@ -1,6 +1,7 @@
 # ModularCommerce
 
 Bu repo, "Backend Developer - 3. Asama Task" dokumanina uygun olarak Onion + mikroservis mimarisi ile tasarlanmistir.
+Guncel durumda servisler feature-based (vertical slice) duzeniyle organize edilmektedir.
 
 ## Mimari
 
@@ -18,12 +19,28 @@ Product servisi katmanlari:
 - `Product.Infrastructure`: EF Core, repository, Redis cache, event publisher.
 - `Product.Api`: endpoint ve authorization katmani.
 
+Product feature slice ornekleri:
+
+- `Product.Api/Features/Products/Create`
+- `Product.Api/Features/Products/Update`
+- `Product.Api/Features/Products/List`
+- `Product.Api/Features/Products/Shared`
+- `Product.Application` katmani sadece abstraction/shared contract odaklidir.
+
 Catalog servisi katmanlari:
 
 - `Catalog.Domain`: `CatalogItem`, `CatalogSagaInstance`, saga state modeli.
 - `Catalog.Application`: SAGA orkestrasyon akisi ve read servisleri.
 - `Catalog.Infrastructure`: EF Core repository + RabbitMQ event consumer.
 - `Catalog.Api`: controller, hosted consumer, migration/bootstrap katmani.
+
+Catalog feature slice ornekleri:
+
+- `Catalog.Api/Features/Catalog/Queries/GetCatalogItems`
+- `Catalog.Api/Features/Catalog/Queries/GetCatalogSagas`
+- `Catalog.Api/Features/Catalog/Commands/SyncProductCreated`
+- `Catalog.Api/Features/Catalog/Commands/SyncProductUpdated`
+- `Catalog.Application` katmani sadece abstraction/shared contract odaklidir.
 
 ## Calisma Mantigi
 
@@ -33,6 +50,12 @@ Auth akisinda:
 - `POST /auth/register` ile kullanici Identity tablosuna kaydedilir.
 - `POST /auth/login` ile kullanici dogrulanir; access token (JWT) ve refresh token uretilir.
 - `POST /auth/refresh` ile gecerli refresh token karsiliginda yeni token cifti verilir.
+
+Auth feature slice ornekleri:
+
+- `Auth.Api/Features/Auth/Register`
+- `Auth.Api/Features/Auth/Login`
+- `Auth.Api/Features/Auth/Refresh`
 
 Product akisinda (CQRS):
 - Yazma islemleri (`POST /products`, `PUT /products/{id}`) command handler'lara gider.
@@ -259,6 +282,11 @@ GET /catalog/sagas
   - `product.updated` -> `product.updated.queue`
 - Authorization role/policy tabanli olacak sekilde tasarlandi (`ProductWriterPolicy`).
 - CI/CD ve SAGA, dokumandaki "ekstra degerlendirme" kismina uygun olarak sonraki iterasyonda genisletilebilir.
+
+## Mimari Dokuman
+
+- Vertical slice migration ve feature konvansiyonu:
+  - `docs/architecture/vertical-slice-migration.md`
 
 ## Kullanilan Patternler ve Nedenleri
 

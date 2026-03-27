@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Text;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Product.Api.Features.Products.Create;
+using Product.Api.Features.Products.Update;
 using Product.Api.Logging;
-using Product.Application;
 using Product.Infrastructure;
 using Product.Infrastructure.Messaging;
 using Product.Infrastructure.Persistence;
@@ -15,7 +17,9 @@ builder.Services.AddOpenApi();
 var centralLogEndpoint = builder.Configuration["CENTRAL_LOG_ENDPOINT"] ?? "http://localhost:5092/logs";
 builder.Logging.AddProvider(new CentralLogForwarderLoggerProvider("Product.Api", centralLogEndpoint));
 builder.Services.AddControllers();
-builder.Services.AddApplication();
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddTransient<CreateProductCommandValidator>();
+builder.Services.AddTransient<UpdateProductCommandValidator>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var issuer = builder.Configuration["JWT_ISSUER"] ?? "modular-commerce";

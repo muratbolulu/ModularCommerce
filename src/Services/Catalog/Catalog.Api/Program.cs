@@ -1,7 +1,10 @@
-using Catalog.Application;
+using Catalog.Api.Features.Catalog.Commands.SyncProductCreated;
+using Catalog.Api.Features.Catalog.Commands.SyncProductUpdated;
+using Catalog.Api.Features.Catalog.Sync;
 using Catalog.Api.Logging;
 using Catalog.Infrastructure;
 using Catalog.Infrastructure.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,8 +13,11 @@ var centralLogEndpoint = builder.Configuration["CENTRAL_LOG_ENDPOINT"] ?? "http:
 builder.Logging.AddProvider(new CentralLogForwarderLoggerProvider("Catalog.Api", centralLogEndpoint));
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
-builder.Services.AddCatalogApplication();
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddTransient<SyncProductCreatedCommandValidator>();
+builder.Services.AddTransient<SyncProductUpdatedCommandValidator>();
 builder.Services.AddCatalogInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<CatalogRabbitMqConsumer>();
 
 var app = builder.Build();
 var requestLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Catalog.Api.Requests");
