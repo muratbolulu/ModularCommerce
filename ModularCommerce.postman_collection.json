@@ -264,6 +264,165 @@
         }
       ],
       "response": []
+    },
+    {
+      "name": "7 - Force Catalog Failure (Negative Price Update)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Keyboard-Failure-{{$timestamp}}\",\n  \"price\": -50,\n  \"stock\": 5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/{{productId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "{{productId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Failure trigger update status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.collectionVariables.set('failureProductId', pm.collectionVariables.get('productId'));",
+              "pm.collectionVariables.set('failureSagaRetryCount', '0');",
+              "pm.collectionVariables.set('softDeleteRetryCount', '0');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "8 - Verify Failure Saga (Auto Retry)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/catalog/sagas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "sagas"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Catalog sagas status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const sagas = pm.response.json();",
+              "const productId = pm.collectionVariables.get('failureProductId');",
+              "const maxRetries = parseInt(pm.collectionVariables.get('maxFailureRetries') || '10', 10);",
+              "let retryCount = parseInt(pm.collectionVariables.get('failureSagaRetryCount') || '0', 10);",
+              "",
+              "const failedSaga = sagas.find(x => x.productId === productId && x.state === 'Failed');",
+              "if (failedSaga) {",
+              "    pm.collectionVariables.set('failureSagaVerified', 'true');",
+              "    pm.collectionVariables.set('failureSagaRetryCount', '0');",
+              "    pm.test('Failure saga detected for product', function () {",
+              "        pm.expect(failedSaga).to.not.eql(undefined);",
+              "    });",
+              "} else if (retryCount < maxRetries) {",
+              "    retryCount += 1;",
+              "    pm.collectionVariables.set('failureSagaRetryCount', String(retryCount));",
+              "    postman.setNextRequest('8 - Verify Failure Saga (Auto Retry)');",
+              "} else {",
+              "    pm.test('Failure saga detected for product', function () {",
+              "        pm.expect.fail('Failure saga did not reach Failed state within retry limit');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "9 - Verify Product Soft-Deleted (Auto Retry)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Products status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const products = pm.response.json();",
+              "const productId = pm.collectionVariables.get('failureProductId');",
+              "const maxRetries = parseInt(pm.collectionVariables.get('maxFailureRetries') || '10', 10);",
+              "let retryCount = parseInt(pm.collectionVariables.get('softDeleteRetryCount') || '0', 10);",
+              "",
+              "const exists = products.some(x => x.id === productId);",
+              "if (!exists) {",
+              "    pm.collectionVariables.set('softDeleteVerified', 'true');",
+              "    pm.collectionVariables.set('softDeleteRetryCount', '0');",
+              "    pm.test('Product is soft-deleted and filtered from list', function () {",
+              "        pm.expect(exists).to.eql(false);",
+              "    });",
+              "} else if (retryCount < maxRetries) {",
+              "    retryCount += 1;",
+              "    pm.collectionVariables.set('softDeleteRetryCount', String(retryCount));",
+              "    postman.setNextRequest('9 - Verify Product Soft-Deleted (Auto Retry)');",
+              "} else {",
+              "    pm.test('Product is soft-deleted and filtered from list', function () {",
+              "        pm.expect.fail('Product still visible in list after retry limit');",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
     }
   ],
   "event": [],
@@ -287,6 +446,30 @@
     {
       "key": "productId",
       "value": ""
+    },
+    {
+      "key": "failureProductId",
+      "value": ""
+    },
+    {
+      "key": "failureSagaRetryCount",
+      "value": "0"
+    },
+    {
+      "key": "softDeleteRetryCount",
+      "value": "0"
+    },
+    {
+      "key": "maxFailureRetries",
+      "value": "10"
+    },
+    {
+      "key": "failureSagaVerified",
+      "value": "false"
+    },
+    {
+      "key": "softDeleteVerified",
+      "value": "false"
     }
   ]
 }
